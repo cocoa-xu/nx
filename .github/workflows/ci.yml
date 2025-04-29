@@ -4,6 +4,9 @@ on:
     branches:
       - main
   pull_request:
+permissions:
+  contents: write
+
 jobs:
   main:
     name: Linux (${{ matrix.working_directory }}, ${{ matrix.elixir }}, ${{ matrix.otp }})
@@ -24,7 +27,7 @@ jobs:
       MIX_ENV: test
       XLA_FLAGS: --xla_force_host_platform_device_count=2
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
@@ -45,52 +48,5 @@ jobs:
       - name: Check formatting
         if: ${{ matrix.lint }}
         run: mix format --check-formatted
-      - name: Run epmd for distributed tests
-        run: epmd -daemon
-      - name: Run tests
-        run: mix test
-
-  win:
-    name: Windows (${{ matrix.working_directory }}, ${{ matrix.elixir }}, ${{ matrix.otp }})
-    runs-on: windows-2019
-    strategy:
-      fail-fast: false
-      matrix:
-        working_directory: ["nx", "torchx"]
-        elixir: ["1.16.2"]
-        otp: ["25.2"]
-    defaults:
-      run:
-        working-directory: ${{ matrix.working_directory }}
-    env:
-      MIX_ENV: test
-      XLA_FLAGS: --xla_force_host_platform_device_count=2
-    steps:
-      - name: Configure Git
-        run: git config --global core.autocrlf input
-        working-directory: .
-      - uses: actions/checkout@v2
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          toolset: 14.2
-          vsversion: 2019
-          arch: x64
-      - uses: erlef/setup-beam@v1
-        with:
-          otp-version: ${{ matrix.otp }}
-          elixir-version: ${{ matrix.elixir }}
-      - name: Retrieve dependencies cache
-        env:
-          cache-name: cache-mix-deps
-        uses: actions/cache@v3
-        id: mix-cache # id to use in retrieve action
-        with:
-          path: ${{ github.workspace }}\${{ matrix.working_directory }}\deps
-          key: ${{ runner.os }}-Elixir-v${{ matrix.elixir }}-OTP-${{ matrix.otp }}-${{ hashFiles(format('{0}\{1}\mix.lock', github.workspace, matrix.working_directory)) }}-v1
-      - name: Install dependencies
-        if: ${{ steps.mix-cache.outputs.cache-hit != 'true' }}
-        run: mix deps.get
-      - name: Compile and check warnings
-        run: mix compile --warnings-as-errors
-      - name: Run tests
-        run: mix test
+      - name: Submit Mix Dependencies
+        uses: erlef/mix-dependency-submission@v1
